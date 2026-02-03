@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"flag"
 	"fmt"
 	"os"
 	"sort"
@@ -16,9 +17,12 @@ type WordCount struct {
 
 func main() {
 	counts := make(map[string]int)
+	top := flag.Int("top", 0, "numero di parole da mostrare (0 = tutte)")
+	flag.Parse()
+	files := flag.Args()
 
-	if len(os.Args) > 1 {
-		for _, filename := range os.Args[1:] {
+	if len(files) > 0 {
+		for _, filename := range files {
 			f, err := os.Open(filename)
 			if err != nil {
 				fmt.Fprintln(os.Stderr, "errore apertura file:", err)
@@ -44,20 +48,22 @@ func main() {
 		}
 		return items[i].Word < items[j].Word
 	})
-	totalWords := 0
-	for _, item := range items {
-		totalWords += item.Count
-	}
 	uniqueWords := len(counts)
+	fmt.Printf("Top %d parole più frequenti:\n", *top)
 
-	fmt.Printf("Parole totali: %d\n", totalWords)
-	fmt.Printf("Parole uniche: %d\n\n", uniqueWords)
-
-	for _, item := range items {
-		if item.Count > 1 {
-			fmt.Printf("%d\t%s\n", item.Count, item.Word)
-		}
+	limit := len(items)
+	if *top > 0 && *top < limit {
+		limit = *top
 	}
+
+	for i := 0; i < limit; i++ {
+		if items[i].Count <= 1 {
+			continue
+		}
+		fmt.Printf("%d. %q - %d occorrenze\n", i+1, items[i].Word, items[i].Count)
+	}
+
+	fmt.Printf("Parole uniche: %d\n\n", uniqueWords)
 
 }
 
