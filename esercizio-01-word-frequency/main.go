@@ -49,8 +49,20 @@ func main() {
 		}
 		return items[i].Word < items[j].Word
 	})
+	totalWords := 0
+	for _, item := range items {
+		totalWords += item.Count
+	}
+
 	uniqueWords := len(counts)
-	fmt.Printf("Top %d parole più frequenti:\n", *top)
+	fmt.Printf("Parole totali: %d\n", totalWords)
+	fmt.Printf("Parole uniche: %d\n\n", uniqueWords)
+
+	if *top > 0 {
+		fmt.Printf("Top %d parole più frequenti:\n", *top)
+	} else {
+		fmt.Println("Tutte le parole (ordinate per frequenza):")
+	}
 
 	limit := len(items)
 	if *top > 0 && *top < limit {
@@ -63,8 +75,6 @@ func main() {
 		}
 		fmt.Printf("%d. %q - %d occorrenze\n", i+1, items[i].Word, items[i].Count)
 	}
-
-	fmt.Printf("Parole uniche: %d\n\n", uniqueWords)
 
 }
 
