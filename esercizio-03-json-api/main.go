@@ -94,3 +94,18 @@ func writeJSON(w http.ResponseWriter, status int, v any) {
 func writeError(w http.ResponseWriter, status int, msg string) {
 	writeJSON(w, status, map[string]string{"error": msg})
 }
+
+func handleBooks(store *BookStore) http.HandlerFunc {
+
+	return func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodGet:
+			books := store.List()
+			writeJSON(w, http.StatusOK, map[string]any{"books": books})
+		case http.MethodPost:
+		default:
+			writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		}
+
+	}
+}
