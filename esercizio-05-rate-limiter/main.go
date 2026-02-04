@@ -36,7 +36,11 @@ func main() {
 	defer limiter.Stop()
 
 	var total int64
-	done := time.After(*duration)
+	done := make(chan struct{})
+	go func() {
+		<-time.After(*duration)
+		close(done)
+	}()
 	var wg sync.WaitGroup
 	wg.Add(*workers)
 	for i := 0; i < *workers; i++ {
@@ -47,10 +51,12 @@ func main() {
 				case <-done:
 					return
 				default:
-					limiter.Wait()
-					atomic.AddInt64(&total, 1)
+					if limiter.TryWait(50 * time.Millisecond) {
+						atomic.AddInt64(&total, 1)
+					}
 				}
 			}
+
 		}()
 	}
 	wg.Wait()
