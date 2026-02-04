@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"encoding/json"
 	"fmt"
 	"os"
 	"strings"
@@ -29,6 +30,33 @@ var countCmd = &cobra.Command{
 			return fmt.Errorf("invalid format: %s", flagFormat)
 		}
 		flagFormat = f
+		type FileStats struct {
+			File  string
+			Stats Stats
+		}
+		results := []FileStats{}
+		for _, path := range args {
+			stats, err := countFile(path, flagLines)
+			if err != nil {
+				return err
+			}
+			results = append(results, FileStats{File: path, Stats: stats})
+		}
+
+		switch flagFormat {
+		case "text":
+			for _, r := range results {
+				fmt.Printf("%s: lines=%d words=%d chars=%d\n", r.File, r.Stats.Lines, r.Stats.Words, r.Stats.Chars)
+			}
+		case "json":
+			json.NewEncoder(os.Stdout).Encode(results)
+		case "csv":
+			fmt.Println("file,lines,words,chars")
+			for _, r := range results {
+				fmt.Printf("%s,%d,%d,%d\n", r.File, r.Stats.Lines, r.Stats.Words, r.Stats.Chars)
+			}
+
+		}
 
 		return nil
 	},
@@ -77,6 +105,7 @@ func countFile(path string, maxLines int) (Stats, error) {
 	if err := scanner.Err(); err != nil {
 		return Stats{}, err
 	}
+
 	return stats, nil
 
 }
