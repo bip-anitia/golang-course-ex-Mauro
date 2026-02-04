@@ -1,10 +1,16 @@
 package main
 
 import (
+	"bufio"
 	"bytes"
+	"flag"
 	"fmt"
 	"io"
 	"net/http"
+	"os"
+	"strings"
+	"sync"
+	"time"
 
 	"golang.org/x/net/html"
 )
@@ -19,8 +25,109 @@ type PageInfo struct {
 }
 
 func main() {
-	// TODO: Implementare il concurrent web scraper
-	fmt.Println("Concurrent Web Scraper")
+	workers := flag.Int("workers", 5, "numero massimo di workers")
+	timeout := flag.Duration("timeout", 10*time.Second, "timeout per richiesta HTTP")
+	flag.Parse()
+
+	args := flag.Args()
+	if len(args) == 0 {
+		fmt.Println("Uso: go run main.go [-workers=N] [-timeout=10s] <urls.txt | url1 url2 ...>")
+		return
+	}
+
+	urls, err := readURLs(args)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Errore lettura URL: %v\n", err)
+		return
+	}
+	if len(urls) == 0 {
+		fmt.Println("Nessun URL valido")
+		return
+	}
+	if *workers < 1 {
+		*workers = 1
+	}
+
+	start := time.Now()
+	fmt.Printf("Scraping %d URLs con %d workers...\n\n", len(urls), *workers)
+
+	client := &http.Client{Timeout: *timeout}
+	jobs := make(chan string)
+	results := make(chan PageInfo)
+
+	var wg sync.WaitGroup
+	wg.Add(*workers)
+	for i := 0; i < *workers; i++ {
+		go func() {
+			defer wg.Done()
+			for url := range jobs {
+				results <- fetch(url, client)
+			}
+		}()
+	}
+	go func() {
+		wg.Wait()
+		close(results)
+	}()
+
+	go func() {
+		for _, u := range urls {
+			jobs <- u
+		}
+		close(jobs)
+	}()
+
+	successes := 0
+	for res := range results {
+		if res.Error != nil {
+			fmt.Printf("[ERROR] %s\n     Error: %v\n\n", res.URL, res.Error)
+			continue
+		}
+		successes++
+		fmt.Printf("[OK] %s\n     Status: %d | Size: %d bytes | Links: %d | Title: %q\n\n",
+			res.URL, res.StatusCode, res.ContentSize, res.LinkCount, res.Title)
+	}
+
+	fmt.Printf("Completato in %s\nSuccessi: %d/%d\n", time.Since(start), successes, len(urls))
+}
+
+func readURLs(args []string) ([]string, error) {
+	if len(args) == 1 {
+		if info, err := os.Stat(args[0]); err == nil && !info.IsDir() {
+			return readURLsFromFile(args[0])
+		}
+	}
+
+	urls := make([]string, 0, len(args))
+	for _, a := range args {
+		u := strings.TrimSpace(a)
+		if u != "" {
+			urls = append(urls, u)
+		}
+	}
+	return urls, nil
+}
+
+func readURLsFromFile(path string) ([]string, error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+
+	urls := []string{}
+	scanner := bufio.NewScanner(f)
+	for scanner.Scan() {
+		line := strings.TrimSpace(scanner.Text())
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+		urls = append(urls, line)
+	}
+	if err := scanner.Err(); err != nil {
+		return nil, err
+	}
+	return urls, nil
 }
 
 func extractTitleAndLinks(r io.Reader) (string, int) {
