@@ -1,8 +1,7 @@
 package main
 
 import (
-	"flag"
-	"fmt"
+	"os"
 
 	"github.com/spf13/cobra"
 )
@@ -21,14 +20,23 @@ var countCmd = &cobra.Command{
 	},
 }
 
+var (
+	flagLines   int
+	flagFormat  string
+	flagVerbose bool
+	flagQuiet   bool
+)
+
 func init() {
 	rootCmd.AddCommand(countCmd)
+	countCmd.Flags().IntVar(&flagLines, "lines", 0, "number of lines to process")
+	countCmd.Flags().StringVar(&flagFormat, "format", "text", "output format")
+	countCmd.Flags().BoolVar(&flagVerbose, "verbose", false, "verbose output")
+	countCmd.Flags().BoolVar(&flagQuiet, "quiet", false, "quiet output")
 }
 
 func main() {
-	// TODO: Definire e parsare i flags
-
-	flag.Parse()
-
-	fmt.Println("CLI Tool con Flags")
+	if err := rootCmd.Execute(); err != nil {
+		os.Exit(1)
+	}
 }
