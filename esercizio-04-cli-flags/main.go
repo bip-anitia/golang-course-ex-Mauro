@@ -66,7 +66,19 @@ var searchCmd = &cobra.Command{
 	Use:   "search [files...]",
 	Short: "Search for a pattern in files",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		// TODO
+		if len(args) == 0 {
+			return fmt.Errorf("no files provided")
+		}
+		for _, path := range args {
+			matches, err := searchFile(path, flagPattern, flagLines)
+			if err != nil {
+				return err
+			}
+			for _, m := range matches {
+				fmt.Printf("%s:%s\n", path, m)
+			}
+		}
+
 		return nil
 	},
 }
@@ -121,4 +133,30 @@ func countFile(path string, maxLines int) (Stats, error) {
 
 	return stats, nil
 
+}
+
+func searchFile(path, pattern string, maxLines int) ([]string, error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+
+	scanner := bufio.NewScanner(f)
+	matches := []string{}
+	lineNum := 0
+	for scanner.Scan() {
+		lineNum++
+		line := scanner.Text()
+		if strings.Contains(line, pattern) {
+			matches = append(matches, fmt.Sprintf("%d:%s", lineNum, line))
+		}
+		if maxLines > 0 && lineNum >= maxLines {
+			break
+		}
+	}
+	if err := scanner.Err(); err != nil {
+		return nil, err
+	}
+	return matches, nil
 }
