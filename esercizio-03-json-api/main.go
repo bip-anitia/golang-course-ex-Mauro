@@ -25,9 +25,15 @@ type BookStore struct {
 }
 
 func main() {
+
 	store := &BookStore{
 		books: make(map[string]Book),
 	}
+
+	http.HandleFunc("/books", handleBooks(store))
+	http.HandleFunc("/books/", handleBook(store))
+
+	http.ListenAndServe(":8080", nil)
 
 }
 
@@ -167,7 +173,12 @@ func handleBook(store *BookStore) http.HandlerFunc {
 			}
 			writeJSON(w, http.StatusOK, updated)
 		case http.MethodDelete:
-			// ...
+			if !store.Delete(id) {
+				writeError(w, http.StatusNotFound, "not found")
+				return
+			}
+			w.WriteHeader(http.StatusNoContent)
+
 		default:
 			writeError(w, http.StatusMethodNotAllowed, "method not allowed")
 		}
