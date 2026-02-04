@@ -1,7 +1,10 @@
 package main
 
 import (
+	"bufio"
+	"fmt"
 	"os"
+	"strings"
 
 	"github.com/spf13/cobra"
 )
@@ -15,7 +18,18 @@ var countCmd = &cobra.Command{
 	Use:   "count [files...]",
 	Short: "Count lines, words, and characters",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		// TODO: implement
+		if flagVerbose && flagQuiet {
+			return fmt.Errorf("cannot use --verbose and --quiet together")
+		}
+		if len(args) == 0 {
+			return fmt.Errorf("no files provided")
+		}
+		f := strings.ToLower(flagFormat)
+		if f != "text" && f != "json" && f != "csv" {
+			return fmt.Errorf("invalid format: %s", flagFormat)
+		}
+		flagFormat = f
+
 		return nil
 	},
 }
@@ -26,6 +40,8 @@ var (
 	flagVerbose bool
 	flagQuiet   bool
 )
+
+type Stats struct{ Lines, Words, Chars int }
 
 func init() {
 	rootCmd.AddCommand(countCmd)
@@ -39,4 +55,28 @@ func main() {
 	if err := rootCmd.Execute(); err != nil {
 		os.Exit(1)
 	}
+}
+
+func countFile(path string, maxLines int) (Stats, error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return Stats{}, err
+	}
+	defer f.Close()
+	scanner := bufio.NewScanner(f)
+	stats := Stats{}
+	for scanner.Scan() {
+		line := scanner.Text()
+		stats.Lines++
+		stats.Words += len(strings.Fields(line))
+		stats.Chars += len(line)
+		if maxLines > 0 && stats.Lines >= maxLines {
+			break
+		}
+	}
+	if err := scanner.Err(); err != nil {
+		return Stats{}, err
+	}
+	return stats, nil
+
 }
