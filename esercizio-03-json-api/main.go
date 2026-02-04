@@ -1,6 +1,7 @@
 package main
 
 import (
+	"strconv"
 	"sync"
 	"time"
 )
@@ -31,7 +32,6 @@ func (s *BookStore) Get(id string) (Book, bool) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	b, ok := s.books[id]
-
 	return b, ok
 }
 
@@ -42,18 +42,35 @@ func (s *BookStore) List() []Book {
 	for _, b := range s.books {
 		list = append(list, b)
 	}
-
 	return list
 }
 
 func (s *BookStore) Create(b Book) Book {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	s.nextID++
+	b.ID = strconv.FormatInt(s.nextID, 10)
+	if b.CreatedAt.IsZero() {
+		b.CreatedAt = time.Now().UTC()
+	}
+	s.books[b.ID] = b
+	return b
+
 }
 
 func (s *BookStore) Update(id string, b Book) (Book, bool) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	old, ok := s.books[id]
+	if !ok {
+		return Book{}, false
+	}
+
+	b.ID = old.ID
+	b.CreatedAt = old.CreatedAt
+	s.books[id] = b
+	return b, true
+
 }
 
 func (s *BookStore) Delete(id string) bool {
@@ -63,6 +80,5 @@ func (s *BookStore) Delete(id string) bool {
 		return false
 	}
 	delete(s.books, id)
-
 	return true
 }
