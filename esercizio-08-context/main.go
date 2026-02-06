@@ -6,8 +6,7 @@ import (
 	"time"
 )
 
-func workerPoolWithContextExample() { /* workers che ascoltano ctx.Done() */ }
-func withValueExample()             { /* key type-safe + helper getter */ }
+func withValueExample() { /* key type-safe + helper getter */ }
 
 func main() {
 	withTimeoutExample()
@@ -89,4 +88,59 @@ func pipeline(ctx context.Context, nums []int) <-chan int {
 	}()
 
 	return out
+}
+
+func workerPoolWithContextExample() {
+	fmt.Println("\nworker pool example: start")
+
+	ctx, cancel := context.WithTimeout(context.Background(), 800*time.Millisecond)
+	defer cancel()
+
+	jobs := make(chan int, 10)
+	results := make(chan int, 10)
+
+	worker := func(ctx context.Context, id int, jobs <-chan int, results chan<- int) {
+		for {
+			select {
+			case <-ctx.Done():
+				fmt.Printf("worker %d stopped: %v\n", id, ctx.Err())
+				return
+			case job, ok := <-jobs:
+				if !ok {
+					return
+				}
+				// Simula lavoro
+				time.Sleep(150 * time.Millisecond)
+
+				// invio risultato cancellabile
+				select {
+				case <-ctx.Done():
+					return
+				case results <- job * 2:
+				}
+			}
+		}
+	}
+
+	for workerID := 1; workerID <= 3; workerID++ {
+		go worker(ctx, workerID, jobs, results)
+	}
+
+	for jobID := 1; jobID <= 10; jobID++ {
+		jobs <- jobID
+	}
+	close(jobs)
+
+	received := 0
+	for received < 10 {
+		select {
+		case <-ctx.Done():
+			fmt.Println("worker pool example done:", ctx.Err())
+			return
+		case value := <-results:
+			fmt.Println("worker pool result:", value)
+			received++
+		}
+	}
+	fmt.Println("worker pool example done: all results received")
 }
